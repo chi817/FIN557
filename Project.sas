@@ -1,7 +1,7 @@
 /*1 Download the data*/
 
 /*Create a library */
-libname project "/home/u63090695/sasuser.v94/fin557/project";
+libname project "/home/u63085035/fin557/project";
 
 /* Part 1*/
 proc contents data=project.data;
@@ -16,31 +16,31 @@ run;
 
 /*Calculate the total bankruptcy count for each year 2017-2023*/
 proc sql;
-select YEAR(BANK_BEGIN_DATE) as YEAR, 
+select YEAR(BANK_BEGIN_DATE) as YEAR_bankrupted, 
        count(COMPANY_FKEY) as bankruptcy_count_year
 from data
 where LOC_STATE_COUNTRY='USA'
-group by calculated YEAR;
+group by calculated YEAR_bankrupted;
 quit;
 
 /*Calculate the bankruptcy count for each SIC each year 2017-2023*/
 proc sql;
 create table SIC_rank as
 select substr(SIC_CODE_FKEY,1,3) as SIC, 
-       YEAR(BANK_BEGIN_DATE) as YEAR, 
+       YEAR(BANK_BEGIN_DATE) as YEAR_bankrupted, 
        count(COMPANY_FKEY) as bankruptcy_count_year,
        SIC_CODE_DESCRIP
 from data
 where LOC_STATE_COUNTRY='USA'
-group by calculated SIC, calculated YEAR
-order by calculated YEAR, bankruptcy_count_year desc;
+group by calculated SIC, calculated YEAR_bankrupted
+order by calculated YEAR_bankrupted, bankruptcy_count_year desc;
 quit;
 
 /*Print only the most bankrupcy observations for every year*/
 data SIC;
 set SIC_rank;
-by YEAR;
-if first.YEAR;
+by YEAR_bankrupted;
+if first.YEAR_bankrupted;
 run;
 
 proc print data=SIC;
@@ -49,55 +49,51 @@ run;
 /*Calculate the bankruptcy count for each State each year 2017-2023*/
 proc sql;
 select LOC_STATE as State, 
-       YEAR(BANK_BEGIN_DATE) as YEAR, 
+       YEAR(BANK_BEGIN_DATE) as YEAR_bankrupted, 
        count(COMPANY_FKEY) as bankruptcy_count_state
 from data
 where LOC_STATE_COUNTRY='USA'
-group by State, calculated YEAR
-order by calculated YEAR, bankruptcy_count_state desc;
+group by State, calculated YEAR_bankrupted
+order by calculated YEAR_bankrupted, bankruptcy_count_state desc;
 quit;
-
-
-proc print data=STATE;
-run;
 
 /*Join the two tables*/
 /*Create year_bank tabke*/
 proc sql;
 create table year_bank as
-select YEAR(BANK_BEGIN_DATE) as YEAR, 
+select YEAR(BANK_BEGIN_DATE) as YEAR_bankrupted, 
        count(COMPANY_FKEY) as bankruptcy_count_year
 from data
 where LOC_STATE_COUNTRY='USA'
-group by calculated YEAR;
+group by calculated YEAR_bankrupted;
 quit;
 
 /*Create state_bank table*/
 proc sql;
 create table state_bank as
-select LOC_STATE as State, YEAR(BANK_BEGIN_DATE) as YEAR, 
+select LOC_STATE as State, YEAR(BANK_BEGIN_DATE) as YEAR_bankrupted, 
        count(COMPANY_FKEY) as bankruptcy_count_state
 from data
 where LOC_STATE_COUNTRY='USA'
-group by State, calculated YEAR
-order by calculated YEAR, bankruptcy_count_state desc;
+group by State, calculated YEAR_bankrupted
+order by calculated YEAR_bankrupted, bankruptcy_count_state desc;
 quit;
 
 /*Join*/
 proc sql;
 create table state as
-select s.State, y.YEAR, s.bankruptcy_count_state, y.bankruptcy_count_year, 
+select s.State, y.YEAR_bankrupted, s.bankruptcy_count_state, y.bankruptcy_count_year, 
        s.bankruptcy_count_state/y.bankruptcy_count_year as bankruptcy_pct format=PERCENT8.2
 from year_bank y
 full join state_bank s
-on y.YEAR=s.YEAR;
+on y.YEAR_bankrupted=s.YEAR_bankrupted;
 quit;
 
 /*Print only the most bankrupcy observations for every year*/
 data State_rank;
 set State;
-by YEAR;
-if first.YEAR;
+by YEAR_bankrupted;
+if first.YEAR_bankrupted;
 run;
 
 proc print data=State_rank;
@@ -121,7 +117,7 @@ run;
 /* Join data and data2 as merge*/
 proc sql;
 create table merge as
-select *
+select *, YEAR(d.BANK_BEGIN_DATE) as YEAR_bankrupted
 from data d left join
      data2 d2
 on d.BEST_EDGAR_TICKER=d2.TIC
@@ -167,7 +163,7 @@ run;
 /* Join merge and market table as merge2*/
 proc sql;
 create table merge2 as
-select m2.*,
+select m.YEAR_bankrupted, m2.*, 
        m.EBIT, m.AT,
        m.SALE, m.LT, 
        m.WCAP, m.RE
@@ -204,8 +200,9 @@ quit;
 /* Calculate the Z-score for each company that got bankrupted*/
 proc sql;
 create table zscore2 as 
-select YEAR, TICKER, COMNAM, A, B, C, D, E, 
-       3.3*A+0.99*B+0.6*C+1.2*D+1.4*E as z_score
+select YEAR, TICKER, YEAR_bankrupted, COMNAM, A, B, C, D, E, 
+       3.3*A+0.99*B+0.6*C+1.2*D+1.4*E as z_score,
+       3.3*A+0.99*B+0.6*C+1.2*D+1.4*E as z_score_category
 from zscore
 order by TICKER, YEAR;
 quit;
@@ -219,9 +216,23 @@ proc format;
 run;
 
 proc print data=zscore2;
-    var YEAR TICKER COMNAM z_score;
-    format  z_score zscorefmt. ;
+    var YEAR TICKER YEAR_bankrupted COMNAM z_score z_score_category;
+    format  z_score_category zscorefmt.;
 run;
+
+proc sql;
+create table zscore3 as
+select YEAR, TICKER, YEAR_bankrupted, COMNAM, z_score, 
+       z_score_category format zscorefmt.
+from zscore2
+group by TICKER
+having YEAR=YEAR_bankrupted;
+quit;
+
+proc print data=zscore3;
+run;
+
+
 
 
 
