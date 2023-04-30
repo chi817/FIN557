@@ -103,7 +103,55 @@ run;
 
 
 
-/*Part 2*/
+
+/* Part 2*/
+proc freq data=data2 order=freq noprint;
+     tables FYEAR*STATE /nocum nopercent out=firms;
+run;
+
+proc sql;
+ create table data4 as 
+ select YEAR(BANK_BEGIN_DATE) as YEAR_bankrupted, LOC_STATE, BEST_EDGAR_TICKER
+ from data
+ where LOC_STATE_COUNTRY='USA';
+quit;
+
+
+proc freq data=data4 order=freq noprint;
+     tables YEAR_bankrupted*LOC_STATE /nocum nopercent out=bankrupt;
+run;
+
+ 
+
+proc sql;
+  select COUNT as BANKRUPT, LOC_STATE as STATE, YEAR_bankrupted
+  from bankrupt;
+quit;
+
+ 
+
+/* Merge bankrup and firm datasets */ 
+proc sql;
+  create table freqtable as 
+  select f.STATE, f.FYEAR, f.count, b.COUNT as BANKRUPT, round(b.COUNT/f.count,0.001)*100 as Ratio_firm_bankrupt_pct
+  from bankrupt b
+  left join firms f
+  on b.YEAR_bankrupted = f.FYEAR AND b.LOC_STATE = f.STATE;
+quit;
+ 
+ 
+proc sql; 
+select STATE, FYEAR, BANKRUPT, Ratio_firm_bankrupt_pct
+from freqtable
+where FYEAR = 2020
+order by ratio_firm_bankrupt_pct desc;
+run;
+
+
+
+
+
+/*Part 3*/
 proc contents data=project.data2;
 run;
 
@@ -117,7 +165,8 @@ run;
 /* Join data and data2 as merge*/
 proc sql;
 create table merge as
-select *, YEAR(d.BANK_BEGIN_DATE) as YEAR_bankrupted
+select *, 
+       YEAR(d.BANK_BEGIN_DATE) as YEAR_bankrupted
 from data d left join
      data2 d2
 on d.BEST_EDGAR_TICKER=d2.TIC
@@ -231,7 +280,6 @@ quit;
 
 proc print data=zscore3;
 run;
-
 
 
 
