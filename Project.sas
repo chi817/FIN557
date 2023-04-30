@@ -1,7 +1,7 @@
 /*1 Download the data*/
 
 /*Create a library */
-libname project "/home/u63085035/fin557/project";
+libname project "/home/u63090695/sasuser.v94/fin557/project";
 
 /* Part 1*/
 proc contents data=project.data;
@@ -28,7 +28,8 @@ proc sql;
 create table SIC_rank as
 select substr(SIC_CODE_FKEY,1,3) as SIC, 
        YEAR(BANK_BEGIN_DATE) as YEAR, 
-       count(COMPANY_FKEY) as bankruptcy_count_year
+       count(COMPANY_FKEY) as bankruptcy_count_year,
+       SIC_CODE_DESCRIP
 from data
 where LOC_STATE_COUNTRY='USA'
 group by calculated SIC, calculated YEAR
@@ -55,6 +56,10 @@ where LOC_STATE_COUNTRY='USA'
 group by State, calculated YEAR
 order by calculated YEAR, bankruptcy_count_state desc;
 quit;
+
+
+proc print data=STATE;
+run;
 
 /*Join the two tables*/
 /*Create year_bank tabke*/
@@ -198,12 +203,25 @@ quit;
 
 /* Calculate the Z-score for each company that got bankrupted*/
 proc sql;
+create table zscore2 as 
 select YEAR, TICKER, COMNAM, A, B, C, D, E, 
        3.3*A+0.99*B+0.6*C+1.2*D+1.4*E as z_score
 from zscore
 order by TICKER, YEAR;
 quit;
 
+/* format Z-score with according Interpretation */ 
+proc format;
+    value zscorefmt  low-<1.8   = 'Probability of Financial distress is very high'
+                     1.8-<2.7   = 'Good chances of going bankrupt within 2 years'
+				     2.7-<2.99  = 'On Alert'
+                     3-high     = 'Safe';
+run;
+
+proc print data=zscore2;
+    var YEAR TICKER COMNAM z_score;
+    format  z_score zscorefmt. ;
+run;
 
 
 
