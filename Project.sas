@@ -165,8 +165,7 @@ run;
 /* Join data and data2 as merge*/
 proc sql;
 create table merge as
-select *, 
-       YEAR(d.BANK_BEGIN_DATE) as YEAR_bankrupted
+select *, YEAR(d.BANK_BEGIN_DATE) as YEAR_bankrupted
 from data d left join
      data2 d2
 on d.BEST_EDGAR_TICKER=d2.TIC
@@ -281,7 +280,39 @@ quit;
 proc print data=zscore3;
 run;
 
+data zscore4;
+	set zscore3;
+	drop z_score_category;
+run;
 
+proc print data=zscore4;
+run;
+
+data high_Risk on_alert safe;
+	set zscore4;
+	length z_score_category $50;
+	if z_score <1.8  then do;
+	z_score_category = 'Probability of Financial distress is very high';
+		output high_Risk;
+	end;
+	else if z_score <2.99  then do;
+	z_score_category = 'On Alert';
+		 output on_alert;
+	end;
+    else do;
+    z_score_category = 'safe';
+		 output safe;
+	end;
+run;
+
+proc print data=high_Risk;
+run;
+
+proc print data=on_alert;
+run;
+
+proc print data=safe;
+run;
 
 
 
